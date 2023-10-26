@@ -3,18 +3,31 @@ using System.Collections.Generic;
 using UnityEngine;
 using WebSocketSharp;
 using System;
+using PimDeWitte.UnityMainThreadDispatcher;
 
 public class WebSocketClient : MonoBehaviour
 {
     private WebSocket ws;
     private Fake f;
     private WebsocketDataHandler dataHandler;
+    [SerializeField] string webSocketUrl = "ws://localhost:8080";
 
     private void Start()
     {
         f = GetComponent<Fake>();
         dataHandler = GetComponent<WebsocketDataHandler>();
-        ws = new WebSocket("ws://localhost:8080");
+        ws = new WebSocket(webSocketUrl);
+        ws.OnMessage += OnWebSocketMessage;
+        ws.Connect();
+    }
+
+    public void ReConnect()
+    {
+        if (ws != null && ws.IsAlive)
+        {
+            ws.Close();
+        }
+        ws = new WebSocket(webSocketUrl);
         ws.OnMessage += OnWebSocketMessage;
         ws.Connect();
     }
@@ -41,20 +54,28 @@ public class WebSocketClient : MonoBehaviour
         {
             try
             {
-                HandleJsonMessage(e.Data);
+                UnityMainThreadDispatcher.Instance().Enqueue(ThisWillBeExecutedOnTheMainThread(e.Data));
             }
             catch (Exception ex)
             {
-                Debug.LogError("Error handling JSON message: " + ex.Message);
+                UnityMainThreadDispatcher.Instance().Enqueue(() => Debug.LogError("Error handling JSON message: " + ex.Message));
             }
         }
         else
         {
-            Debug.LogWarning("Received empty JSON data.");
+            UnityMainThreadDispatcher.Instance().Enqueue(() => Debug.LogWarning("Received empty JSON data."));
         }
     }
 
-    private void HandleJsonMessage(string jsonData)
+    public IEnumerator ThisWillBeExecutedOnTheMainThread(string jsonData)
+    {
+        //Debug.Log("This is executed from the main thread");
+        HandleJsonMessage(jsonData);
+        yield return null;
+    }
+
+
+    public void HandleJsonMessage(string jsonData)
     {
         // Deserialize the JSON into JsonMessage class
         JsonMessage jsonMessage = JsonUtility.FromJson<JsonMessage>(jsonData);
@@ -65,6 +86,10 @@ public class WebSocketClient : MonoBehaviour
 
         switch (messageType)
         {
+            case "INITIAL":
+                InitialData initialData = JsonUtility.FromJson<InitialData>(jsonData);
+                dataHandler.HandleInitialData(initialData);
+                break;
             case "Messaging":
                 MessagingData messageData = JsonUtility.FromJson<MessagingData>(jsonData);
                 dataHandler.HandleMessagingData(messageData.data, messageUse);
@@ -125,66 +150,91 @@ public class JsonMessage
 }
 
 [Serializable]
+public class InitialData
+{
+    public int id;
+    public string type;
+    public string data;
+}
+
+[Serializable]
 public class MessagingData
 {
+    public int id;
+    public string type;
+    public string use;
     public Messaging data;
-    public int AstronautId;
 }
 
 [Serializable]
 public class VitalsData
 {
+    public int id;
+    public string type;
+    public string use;
     public Vitals data;
-    public int AstronautId;
 }
 
 [Serializable]
 public class GeosamplesData
 {
+    public int id;
+    public string type;
+    public string use;
     public Geosamples data;
-    public int AstronautId;
 }
 
 [Serializable]
 public class WaypointsData
 {
+    public int id;
+    public string type;
+    public string use;
     public Waypoints data;
-    public int AstronautId;
 }
 
 [Serializable]
 public class TaskListData
 {
+    public int id;
+    public string type;
+    public string use;
     public TaskList data;
-    public int AstronautId;
 }
 
 [Serializable]
 public class AlertsData
 {
+    public int id;
+    public string type;
+    public string use;
     public Alerts data;
-    public int AstronautId;
 }
 
 [Serializable]
 public class AllBreadCrumbsData
 {
+    public int id;
+    public string type;
+    public string use;
     public AllBreadCrumbs data;
-    public int AstronautId;
 }
 
 [Serializable]
 public class LocationData
 {
+    public int id;
+    public string type;
+    public string use;
     public Location data;
-    public int AstronautId;
 }
 
 [Serializable]
 public class MultiplayerData
 {
-    public FellowAstronauts data;
     public int id;
+    public string type;
+    public string use;
+    public FellowAstronauts data;
     public List<string> dataToChange;
-    public int AstronautId;
 }
